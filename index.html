@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>模擬股票交易競賽 - 單檔 HTML</title>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .hidden { display: none; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <!-- Setup Screen -->
+  <div id="screen-setup" class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl p-8">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-indigo-600 mb-2">📊 模擬股票交易競賽</h1>
+        <p class="text-gray-600">體驗快節奏的股票交易，測試你的投資策略！</p>
+      </div>
+
+      <div class="space-y-6">
+        <div>
+          <label class="block text-lg font-semibold text-gray-700 mb-3">⏱ 比賽時間</label>
+          <div class="flex gap-4">
+            <button data-time="60" class="time-btn flex-1 py-3 rounded-lg font-semibold transition bg-gray-100 text-gray-700 hover:bg-gray-200">1 分鐘</button>
+            <button data-time="120" class="time-btn flex-1 py-3 rounded-lg font-semibold transition bg-indigo-600 text-white">2 分鐘</button>
+            <button data-time="180" class="time-btn flex-1 py-3 rounded-lg font-semibold transition bg-gray-100 text-gray-700 hover:bg-gray-200">3 分鐘</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-lg font-semibold text-gray-700 mb-3">💵 原始資金</label>
+          <div class="flex gap-4">
+            <button data-cash="100000" class="cash-btn flex-1 py-3 rounded-lg font-semibold transition bg-indigo-600 text-white">10 萬</button>
+            <button data-cash="200000" class="cash-btn flex-1 py-3 rounded-lg font-semibold transition bg-gray-100 text-gray-700 hover:bg-gray-200">20 萬</button>
+            <button data-cash="300000" class="cash-btn flex-1 py-3 rounded-lg font-semibold transition bg-gray-100 text-gray-700 hover:bg-gray-200">30 萬</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-lg font-semibold text-gray-700 mb-3">👤 使用者名稱</label>
+          <input id="input-username" type="text" placeholder="請輸入您的代號" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none" />
+        </div>
+
+        <button id="btn-help" class="w-full py-3 bg-yellow-100 text-yellow-800 rounded-lg font-semibold hover:bg-yellow-200 transition">❓ 遊戲說明</button>
+        <div id="help-panel" class="bg-blue-50 p-4 rounded-lg text-sm text-gray-700 space-y-2 hidden">
+          <p><strong>📌 遊戲規則：</strong></p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>在限定時間內透過買賣股票賺取最高獲利</li>
+            <li>支援零股交易：可買賣 10、50、100、200、500、1000 股</li>
+            <li>股價每 2 秒更新一次，波動範圍約 ±0.5%</li>
+            <li>買進手續費：0.1%，賣出手續費：0.4%</li>
+            <li>⚠️ 時間結束時自動以市價賣出所有持股</li>
+            <li>最終總資產 = 結算後的現金總額</li>
+          </ul>
+        </div>
+
+        <button id="btn-start" class="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-bold text-xl hover:from-green-600 hover:to-green-700 transition shadow-lg">▶️ 開始比賽</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Playing Screen -->
+  <div id="screen-playing" class="hidden min-h-screen bg-gray-50 p-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-lg p-6 mb-4 text-center shadow-lg">
+        <span class="text-5xl font-bold" id="timer">0:00</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Left: stock list & transactions -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">📈 股票清單</h2>
+            <div id="stock-list" class="space-y-2"></div>
+          </div>
+
+          <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">📝 交易紀錄</h2>
+            <div id="tx-list" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- Right: account top & trade panel bottom -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">💰 帳戶資訊</h2>
+            <div class="space-y-3">
+              <div class="p-3 bg-indigo-50 rounded-lg">
+                <div class="text-sm text-gray-600">總資產</div>
+                <div id="ui-total-assets" class="text-3xl font-bold text-indigo-600">$0</div>
+                <div id="ui-profit" class="text-sm">0 (0%)</div>
+              </div>
+              <div class="flex justify-between"><span class="text-gray-600">可用現金</span><span id="ui-cash" class="font-semibold">$0</span></div>
+              <div class="flex justify-between"><span class="text-gray-600">總交易成本</span><span id="ui-fee" class="font-semibold text-red-600">$0</span></div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-lg shadow p-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">🎯 交易下單</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">選擇股票</label>
+                <div id="ui-selected-stock" class="p-3 bg-gray-100 rounded-lg text-center text-gray-500">請點擊左側股票選擇</div>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">股數（零股交易）</label>
+                <select id="input-qty" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
+                  <option value="10">10 股</option>
+                  <option value="50">50 股</option>
+                  <option value="100">100 股</option>
+                  <option value="200">200 股</option>
+                  <option value="500">500 股</option>
+                  <option value="1000">1000 股（1 張）</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <button id="btn-buy" class="py-3 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition disabled:bg-gray-300" disabled>買進</button>
+                <button id="btn-sell" class="py-3 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 transition disabled:bg-gray-300" disabled>賣出</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow p-4 mt-4">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">📦 持股狀況</h2>
+        <div id="portfolio-cards" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+      </div>
+    </div>
+
+    <!-- Insufficient Funds Modal -->
+    <div id="modal-overlay" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/40">
+      <div class="w-[92%] max-w-md bg-white rounded-xl shadow-2xl p-6">
+        <div class="flex items-center gap-2 text-red-600 mb-3">
+          <span>⚠️</span>
+          <h3 class="text-xl font-bold">現金不足！</h3>
+        </div>
+        <div class="space-y-2 text-gray-800">
+          <div class="flex justify-between"><span>此筆下單需要：</span><span id="need" class="font-semibold">$0</span></div>
+          <div class="flex justify-between"><span>目前現金：</span><span id="have" class="font-semibold">$0</span></div>
+          <div class="flex justify-between"><span>還差：</span><span id="gap" class="font-semibold text-red-600">$0</span></div>
+        </div>
+        <p class="mt-4 text-sm text-gray-600">請調整股數，或改選其他股票再試一次。</p>
+        <div class="mt-6 grid grid-cols-2 gap-2">
+          <button id="btn-close-modal" class="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold">關閉</button>
+          <button id="btn-buy-10" class="py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">改買 10 股</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Finished Screen -->
+  <div id="screen-finished" class="hidden min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl p-8">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-gray-800 mb-2">🎉 比賽結束！</h1>
+        <p id="final-username" class="text-gray-600"></p>
+      </div>
+
+      <div id="final-summary" class="p-6 rounded-xl mb-6"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-blue-50 p-4 rounded-lg">
+          <div class="text-sm text-gray-600 mb-1">原始資金</div>
+          <div id="final-initial" class="text-2xl font-bold text-blue-600">$0</div>
+        </div>
+        <div class="bg-purple-50 p-4 rounded-lg">
+          <div class="text-sm text-gray-600 mb-1">最終總資產</div>
+          <div id="final-assets" class="text-2xl font-bold text-purple-600">$0</div>
+        </div>
+        <div class="bg-red-50 p-4 rounded-lg">
+          <div class="text-sm text-gray-600 mb-1">總交易成本</div>
+          <div id="final-fee" class="text-2xl font-bold text-red-600">$0</div>
+        </div>
+      </div>
+
+      <div class="bg-gray-50 p-6 rounded-lg mb-6 text-center text-lg">
+        <span class="text-gray-700">最終現金：</span>
+        <span id="final-cash" class="font-bold text-indigo-600 text-2xl ml-2">$0</span>
+      </div>
+
+      <button id="btn-restart" class="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-bold text-xl hover:from-indigo-600 hover:to-purple-700 transition shadow-lg">再玩一次</button>
+    </div>
+  </div>
+
+  <script>
+    // ===== State =====
+    let gameState = 'setup';
+    let timeLeft = 120;
+    let selectedTime = 120;
+    let initialCash = 100000;
+    let userName = '';
+
+    let cash = 100000;
+    let totalFee = 0;
+    const portfolio = {}; // { code: {quantity, avgCost} }
+    const transactions = []; // latest first
+
+    let stocks = [
+      { code: '2330', name: '台積電', price: 580, change: 0 },
+      { code: '0050', name: '元大台灣50', price: 63.5, change: 0 },
+      { code: '2882', name: '國泰金', price: 64.7, change: 0 }
+    ];
+
+    let selectedStock = null;
+    let selectedQuantity = 10;
+
+    let timerInterval = null;
+    let priceInterval = null;
+
+    // ===== Helpers =====
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => '$' + Number(n).toLocaleString();
+
+    function calculateTotalAssets() {
+      let stockValue = 0;
+      Object.keys(portfolio).forEach(code => {
+        const s = stocks.find(x => x.code === code);
+        if (s && portfolio[code].quantity > 0) stockValue += s.price * portfolio[code].quantity;
+      });
+      return cash + stockValue;
+    }
+
+    function calculateFee(amount, isBuy) {
+      const rate = isBuy ? 0.001 : 0.004;
+      return Math.floor(amount * rate);
+    }
+
+    function setScreen(name) {
+      ['screen-setup', 'screen-playing', 'screen-finished'].forEach(id => {
+        const el = $(id);
+        if (!el) return;
+        if (id === 'screen-' + name) el.classList.remove('hidden'); else el.classList.add('hidden');
+      });
+      gameState = name;
+    }
+
+    function renderStockList() {
+      const wrap = $('stock-list');
+      wrap.innerHTML = '';
+      stocks.forEach(stock => {
+        const holding = portfolio[stock.code];
+        const btn = document.createElement('button');
+        btn.className = `w-full p-4 rounded-lg text-left transition border ${selectedStock === stock.code ? 'bg-indigo-50 border-indigo-500' : 'bg-gray-50 hover:bg-gray-100 border-transparent'}`;
+        btn.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-bold text-lg">${stock.name}</div>
+              <div class="text-gray-600 text-sm">${stock.code}</div>
+              ${holding ? `<div class="mt-1 text-xs text-gray-700">持有：<span class="font-semibold">${holding.quantity} 股</span>｜均價：<span class="font-semibold">${holding.avgCost.toFixed(2)}</span></div>` : ''}
+            </div>
+            <div class="text-right">
+              <div class="text-2xl font-bold">$${stock.price.toFixed(2)}</div>
+              <div class="flex items-center justify-end ${stock.change >= 0 ? 'text-green-600' : 'text-red-600'}">
+                <span class="ml-1">${stock.change >= 0 ? '+' : ''}${stock.change}%</span>
+              </div>
+            </div>
+          </div>`;
+        btn.onclick = () => { selectedStock = stock.code; renderSelection(); renderStockList(); };
+        wrap.appendChild(btn);
+      });
+    }
+
+    function renderSelection() {
+      const label = $('ui-selected-stock');
+      const btnBuy = $('btn-buy');
+      const btnSell = $('btn-sell');
+      if (selectedStock) {
+        const s = stocks.find(x => x.code === selectedStock);
+        label.textContent = `${s.name} (${s.code})`;
+        label.classList.remove('text-gray-500');
+        btnBuy.disabled = false; btnSell.disabled = false;
+      } else {
+        label.textContent = '請點擊左側股票選擇';
+        label.classList.add('text-gray-500');
+        btnBuy.disabled = true; btnSell.disabled = true;
+      }
+    }
+
+    function renderPortfolio() {
+      const box = $('portfolio-cards');
+      box.innerHTML = '';
+      const codes = Object.keys(portfolio);
+      if (codes.length === 0) {
+        box.innerHTML = '<p class="text-gray-500 text-center py-4 w-full">目前無持股</p>';
+        return;
+      }
+      codes.forEach(code => {
+        const holding = portfolio[code];
+        if (!holding || holding.quantity <= 0) return;
+        const s = stocks.find(x => x.code === code);
+        const currentValue = s.price * holding.quantity;
+        const cost = holding.avgCost * holding.quantity;
+        const pnl = currentValue - cost;
+        const card = document.createElement('div');
+        card.className = 'p-4 bg-gray-50 rounded-lg';
+        card.innerHTML = `
+          <div class="flex justify-between mb-2"><span class="font-bold text-lg">${s.name}</span><span class="text-gray-600">${code}</span></div>
+          <div class="flex justify-between mb-1"><span class="text-gray-600">持有</span><span class="font-semibold">${holding.quantity} 股</span></div>
+          <div class="flex justify-between mb-1"><span class="text-gray-600">成本</span><span class="text-sm">$${holding.avgCost.toFixed(2)}</span></div>
+          <div class="flex justify-between"><span class="text-gray-600">損益</span><span class="font-bold ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}">${pnl >= 0 ? '+' : ''}${pnl.toLocaleString()}</span></div>`;
+        box.appendChild(card);
+      });
+    }
+
+    function renderTx() {
+      const box = $('tx-list');
+      box.innerHTML = '';
+      if (transactions.length === 0) {
+        box.innerHTML = '<p class="text-gray-500 text-center py-4">尚無交易紀錄</p>';
+        return;
+      }
+      transactions.slice(0, 10).forEach(tx => {
+        const row = document.createElement('div');
+        row.className = 'grid grid-cols-5 items-center p-2 bg-gray-50 rounded text-sm';
+        row.innerHTML = `<span class="text-gray-600">${tx.time}</span>
+                         <span class="font-semibold ${tx.type === '買進' ? 'text-green-600' : 'text-red-600'}">${tx.type}</span>
+                         <span>${tx.code}</span>
+                         <span>$${tx.price}</span>
+                         <span>${tx.quantity}股</span>`;
+        box.appendChild(row);
+      });
+    }
+
+    function renderAccount() {
+      const totalAssets = calculateTotalAssets();
+      const profit = totalAssets - initialCash;
+      $('ui-total-assets').textContent = fmt(totalAssets);
+      const pct = ((profit / initialCash) * 100).toFixed(2);
+      const profitEl = $('ui-profit');
+      profitEl.textContent = `${profit >= 0 ? '+' : ''}${profit.toLocaleString()} (${pct}%)`;
+      profitEl.className = `text-sm ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`;
+      $('ui-cash').textContent = fmt(cash);
+      $('ui-fee').textContent = fmt(totalFee);
+    }
+
+    function updateTimerLabel() {
+      const m = Math.floor(timeLeft / 60);
+      const s = (timeLeft % 60).toString().padStart(2, '0');
+      $('timer').textContent = `${m}:${s}`;
+    }
+
+    function startGame() {
+      if (!userName.trim()) { alert('請輸入使用者名稱！'); return; }
+      cash = initialCash;
+      totalFee = 0;
+      Object.keys(portfolio).forEach(k => delete portfolio[k]);
+      transactions.length = 0;
+      selectedStock = null; selectedQuantity = 10;
+      timeLeft = selectedTime;
+
+      setScreen('playing');
+      renderSelection();
+      renderStockList();
+      renderTx();
+      renderAccount();
+      renderPortfolio();
+      updateTimerLabel();
+
+      // price updates
+      priceInterval = setInterval(() => {
+        stocks = stocks.map(s => {
+          const changeRate = (Math.random() - 0.5) * 0.01; // ±0.5%
+          const newPrice = Math.round(s.price * (1 + changeRate) * 100) / 100;
+          const changePct = ((newPrice - s.price) / s.price * 100).toFixed(2);
+          return { ...s, price: newPrice, change: parseFloat(changePct) };
+        });
+        renderStockList();
+        renderPortfolio();
+        renderAccount();
+      }, 2000);
+
+      // timer countdown
+      timerInterval = setInterval(() => {
+        timeLeft -= 1;
+        updateTimerLabel();
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      if (timerInterval) clearInterval(timerInterval);
+      if (priceInterval) clearInterval(priceInterval);
+
+      // auto sell everything
+      Object.keys(portfolio).forEach(code => {
+        const s = stocks.find(x => x.code === code);
+        const holding = portfolio[code];
+        if (s && holding.quantity > 0) {
+          const amount = s.price * holding.quantity;
+          const fee = calculateFee(amount, false);
+          cash += (amount - fee);
+          totalFee += fee;
+          holding.quantity = 0;
+        }
+      });
+
+      // final summary
+      const finalAssets = calculateTotalAssets();
+      const finalProfit = finalAssets - initialCash;
+      const returnRate = ((finalProfit / initialCash) * 100).toFixed(2);
+
+      const summary = $('final-summary');
+      summary.className = `p-6 rounded-xl mb-6 ${finalProfit >= 0 ? 'bg-green-50 border-2 border-green-500' : 'bg-red-50 border-2 border-red-500'}`;
+      summary.innerHTML = `
+        <div class="text-center">
+          <div class="text-2xl font-semibold text-gray-700 mb-2">最終獲利</div>
+          <div class="text-6xl font-bold ${finalProfit >= 0 ? 'text-green-600' : 'text-red-600'}">${finalProfit >= 0 ? '+' : ''}${finalProfit.toLocaleString()}</div>
+          <div class="text-xl mt-2 ${finalProfit >= 0 ? 'text-green-600' : 'text-red-600'}">報酬率：${returnRate}%</div>
+        </div>`;
+
+      $('final-username').textContent = `參賽者：${userName}`;
+      $('final-initial').textContent = fmt(initialCash);
+      $('final-assets').textContent = fmt(finalAssets);
+      $('final-fee').textContent = fmt(totalFee);
+      $('final-cash').textContent = fmt(cash);
+
+      setScreen('finished');
+    }
+
+    function buy() {
+      if (!selectedStock) { alert('請選擇股票！'); return; }
+      const s = stocks.find(x => x.code === selectedStock);
+      const qty = Number($('input-qty').value) || 10;
+      selectedQuantity = qty;
+      const amount = s.price * qty;
+      const fee = calculateFee(amount, true);
+      const total = amount + fee;
+
+      if (cash < total) {
+        $('need').textContent = fmt(total);
+        $('have').textContent = fmt(cash);
+        $('gap').textContent = fmt(total - cash);
+        $('modal-overlay').classList.remove('hidden');
+        return;
+      }
+
+      cash -= total;
+      totalFee += fee;
+      const current = portfolio[selectedStock] || { quantity: 0, avgCost: 0 };
+      const totalQuantity = current.quantity + qty;
+      const totalCost = (current.avgCost * current.quantity) + amount;
+      const avgCost = totalCost / totalQuantity;
+      portfolio[selectedStock] = { quantity: totalQuantity, avgCost };
+
+      transactions.unshift({ time: new Date().toLocaleTimeString(), type: '買進', code: selectedStock, price: s.price, quantity: qty, fee });
+      if (transactions.length > 50) transactions.pop();
+
+      renderTx();
+      renderAccount();
+      renderPortfolio();
+      renderStockList();
+    }
+
+    function sell() {
+      if (!selectedStock) { alert('請選擇股票！'); return; }
+      const s = stocks.find(x => x.code === selectedStock);
+      const qty = Number($('input-qty').value) || 10;
+      selectedQuantity = qty;
+      const holding = portfolio[selectedStock];
+      if (!holding || holding.quantity < qty) { alert('持股數量不足！'); return; }
+      const amount = s.price * qty;
+      const fee = calculateFee(amount, false);
+      const received = amount - fee;
+
+      cash += received;
+      totalFee += fee;
+      holding.quantity -= qty;
+      if (holding.quantity <= 0) delete portfolio[selectedStock];
+
+      transactions.unshift({ time: new Date().toLocaleTimeString(), type: '賣出', code: selectedStock, price: s.price, quantity: qty, fee });
+      if (transactions.length > 50) transactions.pop();
+
+      renderTx();
+      renderAccount();
+      renderPortfolio();
+      renderStockList();
+    }
+
+    // ===== Event bindings =====
+    document.querySelectorAll('.time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedTime = Number(btn.getAttribute('data-time'));
+        document.querySelectorAll('.time-btn').forEach(b => b.className = 'time-btn flex-1 py-3 rounded-lg font-semibold transition bg-gray-100 text-gray-700 hover:bg-gray-200');
+        btn.className = 'time-btn flex-1 py-3 rounded-lg font-semibold transition bg-indigo-600 text-white';
+      });
+    });
+
+    document.querySelectorAll('.cash-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        initialCash = Number(btn.getAttribute('data-cash'));
+        document.querySelectorAll('.cash-btn').forEach(b => b.className = 'cash-btn flex-1 py-3 rounded-lg font-semibold transition bg-gray-100 text-gray-700 hover:bg-gray-200');
+        btn.className = 'cash-btn flex-1 py-3 rounded-lg font-semibold transition bg-indigo-600 text-white';
+      });
+    });
+
+    $('btn-help').addEventListener('click', () => {
+      $('help-panel').classList.toggle('hidden');
+    });
+
+    $('btn-start').addEventListener('click', () => {
+      userName = $('input-username').value || '';
+      startGame();
+    });
+
+    $('input-qty').addEventListener('change', (e) => {
+      selectedQuantity = Number(e.target.value) || 10;
+    });
+
+    $('btn-buy').addEventListener('click', buy);
+    $('btn-sell').addEventListener('click', sell);
+
+    $('btn-close-modal').addEventListener('click', () => $('modal-overlay').classList.add('hidden'));
+    $('btn-buy-10').addEventListener('click', () => {
+      $('input-qty').value = '10';
+      selectedQuantity = 10;
+      $('modal-overlay').classList.add('hidden');
+    });
+
+    $('btn-restart').addEventListener('click', () => {
+      setScreen('setup');
+    });
+
+    // Init
+    setScreen('setup');
+  </script>
+</body>
+</html>
